@@ -1,0 +1,126 @@
+Bien sûr ! Voici les grandes étapes pour installer et configurer ton projet avec Bind (DNS), Nginx (reverse proxy) et tes services (WordPress, Dashy, Gitea).  
+**Je vais t’indiquer les commandes principales à chaque étape, sur Debian/Ubuntu (adapte si tu es sur une autre distribution).**
+
+---
+
+## 1. Installer Bind (serveur DNS) sur 192.168.30.10
+
+```bash
+sudo apt update
+sudo apt install bind9 bind9utils bind9-doc
+```
+
+**Configurer la zone :**
+- Édite `/etc/bind/named.conf.local` et ajoute :
+
+```bash
+zone "auth.local" {
+    type master;
+    file "/etc/bind/zones/db.auth.local";
+};
+```
+
+- Crée le dossier si besoin :  
+  `sudo mkdir -p /etc/bind/zones`
+- Crée le fichier `/etc/bind/zones/db.auth.local` :
+
+```dns
+$TTL 604800
+@   IN  SOA ns.auth.local. admin.auth.local. (
+        2       ; Serial
+        604800  ; Refresh
+        86400   ; Retry
+        2419200 ; Expire
+        604800) ; Negative Cache TTL
+;
+@       IN  NS      ns.auth.local.
+ns      IN  A       192.168.30.10
+wordpress   IN  A   192.168.30.100
+gitea       IN  A   192.168.30.100
+dashy       IN  A   192.168.30.100
+```
+
+- Redémarre Bind :
+
+```bash
+sudo systemctl restart bind9
+```
+
+- **Pense à configurer tes clients pour utiliser 192.168.30.10 comme DNS !**
+
+---
+
+## 2. Installer Nginx (reverse proxy) sur 192.168.30.100
+
+```bash
+sudo apt update
+sudo apt install nginx
+```
+
+**Exemple de config `/etc/nginx/sites-available/proxy` :**
+
+```nginx
+server {
+    listen 80;
+    server_name wordpress.auth.local;
+
+    location / {
+        proxy_pass http://192.168.30.20:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+server {
+    listen 80;
+    server_name gitea.auth.local;
+
+    location / {
+        proxy_pass http://192.168.30.90:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+server {
+    listen 80;
+    server_name dashy.auth.local;
+
+    location / {
+        proxy_pass http://192.168.30.90:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+**Active la config et redémarre Nginx :**
+
+```bash
+sudo ln -s /etc/nginx/sites-available/proxy /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
+## 3. Installer les services (WordPress, Dashy, Gitea)
+
+- **WordPress** (sur 192.168.30.20) :  
+  Utilise `docker`, `docker-compose` ou installation classique LAMP selon ton choix.
+- **Dashy** (sur 192.168.30.90:8080) :  
+  [https://dashy.to/docs/](https://dashy.to/docs/)
+- **Gitea** (sur 192.168.30.90:3000) :  
+  [https://docs.gitea.com/installation](https://docs.gitea.com/installation)
+
+(Tu peux me préciser si tu veux les étapes pour installer l’un de ces services !)
+
+---
+
+## 4. Tester
+
+- Sur un client, mets 192.168.30.10 comme DNS.
+- Ping `wordpress.auth.local`, il doit répondre 192.168.30.100.
+- Ouvre `http://wordpress.auth.local` dans un navigateur, ça doit t'afficher ton site WordPress (ou l'accueil du service, selon ce qui tourne).
+
+---
+
+Dis-moi sur quelle(s) partie(s) tu veux plus de détails ou si tu veux un script pour automatiser !
