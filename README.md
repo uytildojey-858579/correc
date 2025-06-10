@@ -8,7 +8,7 @@ nano /etc/authelia/configuration.yml
 
 ```yml
 server:
-  host: 0.0.0.0
+  address: 0.0.0.0
   port: 9091
 
 authentication_backend:
@@ -18,22 +18,23 @@ authentication_backend:
 access_control:
   default_policy: deny
   rules:
+    - domain: "auth.local"
+      policy: one_factor
     - domain: "*.auth.local"
       policy: one_factor
 
 session:
   name: authelia_session
-  secret: "Jev78444d4d4ddddd44s5qd568qd745c6x4114eff4d9vcx"
-  jwt_secret: "vraiment_un_secret_long_et_complexe"
+  secret: "remplace_ceci_par_un_hhhhhhhh77777778888888888secret_long"
+  jwt_secret: "remplace_ceci_par_un_autre_se88888888888cret_lonhhhhhhhhhhhhhhhhhhhhhhhhg"
   expiration: 1h
   cookies:
-    domain: .auth.local
-    authelia_url: https://auth.auth.local
+    domain: auth.local  # PAS de point devant
 
 storage:
   local:
     path: /config/db.sqlite3
-    encryption_key: "cle_32caracteres_ou_plus"
+    encryption_key: "remplace_ceci_par9999999999999999999999999999_une_cle_32caracteres"
 
 notifier:
   filesystem:
