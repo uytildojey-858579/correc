@@ -34,11 +34,16 @@ notifier:
   filesystem:
     directory: /config/notification
 ```
+- pour générer un secret
+```bash
+openssl rand -hex 32
+```
 
 ```bash
 nano /etc/authelia/users_database.yml
 ```
 
+- on peut ajouter ou modifier les utilisateurs 
 ```yml
 users:
   tonutilisateur:
