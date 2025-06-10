@@ -24,15 +24,20 @@ access_control:
 session:
   name: authelia_session
   secret: "Jev78444d4d4ddddd44s5qd568qd745c6x4114eff4d9vcx"
+  jwt_secret: "vraiment_un_secret_long_et_complexe"
   expiration: 1h
+  cookies:
+    domain: .auth.local
+    authelia_url: https://auth.auth.local
 
 storage:
   local:
     path: /config/db.sqlite3
+    encryption_key: "cle_32caracteres_ou_plus"
 
 notifier:
   filesystem:
-    directory: /config/notification
+    filename: /config/notification.txt
 ```
 - pour générer un secret
 ```bash
