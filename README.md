@@ -23,7 +23,7 @@ access_control:
 
 session:
   name: authelia_session
-  secret: "0000"
+  secret: "Jev78444d4d4ddddd44s5qd568qd745c6x4114eff4d9vcx"
   expiration: 1h
 
 storage:
@@ -46,15 +46,15 @@ nano /etc/authelia/users_database.yml
 - on peut ajouter ou modifier les utilisateurs 
 ```yml
 users:
-  tonutilisateur:
-    password: "$argon2id$v=19$m=65536,t=2,p=1$....." # À générer
-    displayname: "Ton Nom"
-    email: ton@mail.com
+  admin:
+    password: "#le mdp généré"
+    displayname: "Administrateur"
+    email: admin@admin.com
 ```
 
 
 ```bash
-docker run authelia/authelia:latest authelia hash-password '0000'
+docker run authelia/authelia:latest authelia  '0000'
 ```
 
 ```bash
