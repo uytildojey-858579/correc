@@ -1,9 +1,12 @@
 - docker pull authelia/authelia
 - sudo mkdir -p /etc/authelia
 - cd /etc/authelia
-- nano /etc/authelia/configuration.yml
 
 ```bash
+nano /etc/authelia/configuration.yml
+```
+
+```yml
 server:
   host: 0.0.0.0
   port: 9091
@@ -33,15 +36,22 @@ notifier:
 ```
 
 ```bash
+nano /etc/authelia/users_database.yml
+```
+
+```yml
 users:
   tonutilisateur:
     password: "$argon2id$v=19$m=65536,t=2,p=1$....." # À générer
     displayname: "Ton Nom"
     email: ton@mail.com
 ```
+
+
 ```bash
-docker run authelia/authelia:latest authelia hash-password 'tonmotdepasse'
+docker run authelia/authelia:latest authelia hash-password '0000'
 ```
+
 ```bash
 docker run -d \
   --name authelia \
@@ -50,7 +60,12 @@ docker run -d \
   authelia/authelia
 ```
 
-  
+
+```bash
+/etc/nginx/sites-available/proxy
+```
+
+
 ```
 # HTTP vers HTTPS (redirection)
 server {
