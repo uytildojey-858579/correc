@@ -1,165 +1,175 @@
-### kdo
----
+- docker pull authelia/authelia
+- sudo mkdir -p /etc/authelia
+- cd /etc/authelia
+- nano /etc/authelia/configuration.yml
 
-## 🎯 OBJECTIF FINAL
+server:
+  host: 0.0.0.0
+  port: 9091
 
-Un utilisateur tape dans son navigateur :
+authentication_backend:
+  file:
+    path: /config/users_database.yml
 
-* `wordpress.local` → Bind9 redirige vers 192.168.30.100 (reverse proxy), qui transmet à 192.168.30.20 (WordPress)
-* `dashy.local` → vers 192.168.30.90:6000
-* `gitea.local` → vers 192.168.30.90:3000
+access_control:
+  default_policy: deny
+  rules:
+    - domain: "*.auth.local"
+      policy: one_factor
 
----
+session:
+  name: authelia_session
+  secret: "0000"
+  expiration: 1h
 
-## ✅ 1. CONFIGURER LE DNS AVEC BIND9 (sur 192.168.30.10)
+storage:
+  local:
+    path: /config/db.sqlite3
 
-### 🔹 Installer Bind9
+notifier:
+  filesystem:
+    directory: /config/notification
 
-```bash
-sudo apt update
-sudo apt install bind9 -y
-```
 
-### 🔹 Créer une zone DNS pour `.local`
+users:
+  tonutilisateur:
+    password: "$argon2id$v=19$m=65536,t=2,p=1$....." # À générer
+    displayname: "Ton Nom"
+    email: ton@mail.com
 
-Dans `/etc/bind/named.conf.local`, ajoute :
 
-```bash
-zone "local" {
-    type master;
-    file "/etc/bind/db.local";
-};
-```
+docker run authelia/authelia:latest authelia hash-password 'tonmotdepasse'
 
-### 🔹 Créer le fichier de zone `/etc/bind/db.local`
 
-```bash
-$TTL 604800
-@   IN  SOA dns.local. root.local. (
-              2         ; Serial
-         604800         ; Refresh
-          86400         ; Retry
-        2419200         ; Expire
-         604800 )       ; Negative Cache TTL
+docker run -d \
+  --name authelia \
+  -p 9091:9091 \
+  -v /etc/authelia:/config \
+  authelia/authelia
 
-@       IN  NS  dns.local.
 
-dns     IN  A   192.168.30.10
-wordpress IN A  192.168.30.100
-dashy    IN A   192.168.30.100
-gitea    IN A   192.168.30.100
-```
-
-> Tous les domaines pointent vers le reverse proxy (192.168.30.100)
-
-### 🔹 Redémarrer Bind9
-
-```bash
-sudo named-checkconf
-sudo named-checkzone local /etc/bind/db.local
-sudo systemctl restart bind9
-```
-
----
-
-## ✅ 2. CONFIGURER LES CLIENTS POUR UTILISER TON DNS
-
-Sur les PC ou VMs clientes, mets **192.168.30.10** comme **serveur DNS** dans les paramètres réseau.
-
-Teste avec :
-
-```bash
-ping wordpress.local
-```
-
----
-
-## ✅ 3. CONFIGURER LE REVERSE PROXY NGINX (sur 192.168.30.100)
-
-### 🔹 Installer Nginx
-
-```bash
-sudo apt update
-sudo apt install nginx -y
-```
-
-### 🔹 Configurer les sites
-
-Crée trois fichiers dans `/etc/nginx/sites-available` :
-
-#### 🔸 `wordpress.local`
-
-```nginx
+  
+    
+# HTTP vers HTTPS (redirection)
 server {
     listen 80;
-    server_name wordpress.local;
+    server_name wordpress.auth.local gitea.auth.local dashy.auth.local;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS pour WordPress
+server {
+    listen 443 ssl;
+    server_name wordpress.auth.local;
+    
+    ssl_certificate /etc/nginx/ssl/nginx.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+    ssl_trusted_certificate /etc/nginx/ssl/ca_root.crt;
 
     location / {
-        proxy_pass http://192.168.30.20;
+        auth_request /authelia;
+        auth_request_set $target_url $scheme://$http_host$request_uri;
+        error_page 401 =302 https://wordpress.auth.local:9091/?rd=$target_url;
+
+        proxy_pass http://192.168.30.20:80;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
-}
-```
-
-#### 🔸 `dashy.local`
-
-```nginx
-server {
-    listen 80;
-    server_name dashy.local;
-
-    location / {
-        proxy_pass http://192.168.30.90:6000;
-        proxy_set_header Host $host;
+    location = /authelia {
+        internal;
+        proxy_pass http://127.0.0.1:9091/api/verify;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-```
 
-#### 🔸 `gitea.local`
-
-```nginx
+# HTTPS pour Gitea
 server {
-    listen 80;
-    server_name gitea.local;
+    listen 443 ssl;
+    server_name gitea.auth.local;
+    
+    ssl_certificate /etc/nginx/ssl/nginx.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+    ssl_trusted_certificate /etc/nginx/ssl/ca_root.crt;
 
     location / {
+        auth_request /authelia;
+        auth_request_set $target_url $scheme://$http_host$request_uri;
+        error_page 401 =302 https://gitea.auth.local:9091/?rd=$target_url;
+
         proxy_pass http://192.168.30.90:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /authelia {
+        internal;
+        proxy_pass http://127.0.0.1:9091/api/verify;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-```
 
-### 🔹 Activer les sites
+# HTTPS pour Dashy
+server {
+    listen 80;
+    server_name wordpress.auth.local gitea.auth.local dashy.auth.local;
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name dashy.auth.local;
+    
+    ssl_certificate /etc/nginx/ssl/nginx.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+    ssl_trusted_certificate /etc/nginx/ssl/ca_root.crt;
 
-```bash
-sudo ln -s /etc/nginx/sites-available/wordpress.local /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/dashy.local /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/gitea.local /etc/nginx/sites-enabled/
-```
+    location / {
+        auth_request /authelia;
+        auth_request_set $target_url $scheme://$http_host$request_uri;
+        error_page 401 =302 https://dashy.auth.local:9091/?rd=$target_url;
 
-### 🔹 Redémarrer Nginx
+        proxy_pass http://192.168.30.90:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /authelia {
+        internal;
+        proxy_pass http://127.0.0.1:9091/api/verify;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
 
----
 
-## ✅ 4. TESTER
 
-Depuis un client configuré avec le DNS :
 
-* Accède à `http://wordpress.local` → doit afficher WordPress
-* Accède à `http://dashy.local` → Dashy
-* Accède à `http://gitea.local` → Gitea
 
----
 
-Si tu veux, je peux te faire un **schéma réseau clair** ou une **vérification des fichiers de conf** — tu veux ?
+
+
+
+
+
+
 
 
 
