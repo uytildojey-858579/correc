@@ -1,3 +1,187 @@
+Voici une procédure complète et claire pour installer et configurer **Authelia v4.37.5** en Docker, adaptée à ce que nous venons de faire. Cette version est stable et bien documentée.
+
+---
+
+## 1. Prérequis
+
+- Docker installé sur ton serveur.
+- Un dossier de configuration pour Authelia (ex : `/etc/authelia`).
+- Un nom de domaine local ou public pour l’authentification (ex : `auth.local`).
+- Un fichier d’utilisateurs : `/etc/authelia/users_database.yml` (tu peux l’ajouter après, ce n’est pas bloquant pour démarrer le service).
+
+---
+
+## 2. Génère tes secrets
+
+Utilise ces commandes pour générer des secrets (remplace-les dans la config ci-dessous) :
+
+```bash
+openssl rand -hex 32  # pour 'secret', 'jwt_secret', 'encryption_key'
+```
+
+---
+
+## 3. Crée le fichier de configuration
+
+Crée le fichier `/etc/authelia/configuration.yml` avec ce contenu :
+
+```yaml name=/etc/authelia/configuration.yml
+server:
+  host: 0.0.0.0
+  port: 9091
+
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: "auth.local"
+      policy: one_factor
+    - domain: "*.auth.local"
+      policy: one_factor
+
+session:
+  name: authelia_session
+  secret: "COLLE_ICI_TA_CLE_SECRET"
+  expiration: 1h
+  domain: auth.local
+
+storage:
+  local:
+    path: /config/db.sqlite3
+  encryption_key: "COLLE_ICI_TA_CLE_ENCRYPTION"
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt
+
+jwt_secret: "COLLE_ICI_TA_CLE_JWT"
+```
+
+**Remplace les valeurs des secrets par celles générées.**
+
+---
+
+## 4. Lance le conteneur Docker
+
+```bash
+docker stop authelia || true
+docker rm authelia || true
+
+docker run -d \
+  --name authelia \
+  -p 9091:9091 \
+  -v /etc/authelia:/config \
+  authelia/authelia:4.37.5
+```
+
+---
+
+## 5. Vérification
+
+1. **Vérifie les logs** pour t’assurer qu’il n’y a pas d’erreur :
+   ```bash
+   docker logs -f authelia
+   ```
+   Tu dois voir un message comme `Authelia is running`.
+
+2. **Accède à l’interface d’Authelia** avec :  
+   [http://localhost:9091](http://localhost:9091)  
+   (ou adapte l’URL selon ton reverse proxy et ton domaine)
+
+---
+
+## 6. Ajoute des utilisateurs
+
+Crée le fichier `/etc/authelia/users_database.yml` avec un exemple d’utilisateur (à adapter à tes besoins) :
+
+```yaml name=/etc/authelia/users_database.yml
+users:
+  alice:
+    displayname: "Alice Doe"
+    password: "$argon2id$v=19$m=65536,t=2,p=1$...$..."  # Hash généré avec authelia hash-password
+    email: alice@example.com
+    groups:
+      - admins
+```
+
+Pour générer un hash de mot de passe :
+```bash
+docker run --rm authelia/authelia:4.37.5 authelia hash-password 'ton_mot_de_passe'
+```
+
+---
+
+## 7. Redémarre le conteneur si tu modifies la config
+
+```bash
+docker restart authelia
+```
+
+---
+
+## 8. Points d’attention
+
+- **Nom de domaine** : Mets bien le même domaine partout (`auth.local` ou autre).
+- **Reverse proxy** : Si tu utilises Nginx, Traefik, etc., configure-le pour rediriger vers le port 9091 de ce conteneur.
+- **Sécurité** : Ne partage jamais tes secrets et garde-les dans un endroit sûr.
+
+---
+
+### **Résumé rapide**
+
+1. Place le fichier de config corrigé dans `/etc/authelia`.
+2. Génére les secrets.
+3. Lance le conteneur avec la bonne version.
+4. Vérifie les logs.
+5. Ajoute tes utilisateurs.
+
+---
+
+Si tu veux une procédure personnalisée avec reverse proxy, LDAP ou autre, dis-le moi !  
+Bravo d’avoir persévéré 👏
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+
+
+
+
 - docker pull authelia/authelia
 - sudo mkdir -p /etc/authelia
 - cd /etc/authelia
