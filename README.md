@@ -3,6 +3,7 @@
 - cd /etc/authelia
 - nano /etc/authelia/configuration.yml
 
+```bash
 server:
   host: 0.0.0.0
   port: 9091
@@ -29,27 +30,28 @@ storage:
 notifier:
   filesystem:
     directory: /config/notification
+```
 
-
+```bash
 users:
   tonutilisateur:
     password: "$argon2id$v=19$m=65536,t=2,p=1$....." # À générer
     displayname: "Ton Nom"
     email: ton@mail.com
-
-
+```
+```bash
 docker run authelia/authelia:latest authelia hash-password 'tonmotdepasse'
-
-
+```
+```bash
 docker run -d \
   --name authelia \
   -p 9091:9091 \
   -v /etc/authelia:/config \
   authelia/authelia
-
+```
 
   
-    
+```
 # HTTP vers HTTPS (redirection)
 server {
     listen 80;
@@ -157,7 +159,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-
+```
 
 
 
